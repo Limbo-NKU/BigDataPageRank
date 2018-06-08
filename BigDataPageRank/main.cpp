@@ -17,7 +17,7 @@ double *rold;
 double *rnew;
 
 int maxNode = 0;
-
+//一遍读取原数据，统计总节点数
 void preLoad()
 {
 	ifstream in("WikiData.txt");
@@ -39,7 +39,7 @@ void preLoad()
 	cout << "total nodes = " << maxNode << endl;
 	cout << "total reports = " << maxReport << endl;
 }
-
+//根据统计的节点数分配空间
 void makeSpace()
 {
 	if (maxNode > 0)
@@ -55,7 +55,7 @@ void makeSpace()
 		}
 	}
 }
-
+//计算节点出度并形成邻接链表
 void calcNumOut()
 {
 	int  now = 0;
@@ -78,12 +78,12 @@ void calcNumOut()
 		}
 	}
 }
-
+//初始化M，rold，rnew
 void preSet()
 {
-
+	
 }
-
+//迭代计算pageRank
 void Iterator()
 {
 
