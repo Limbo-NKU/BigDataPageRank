@@ -12,11 +12,15 @@ struct matEle
 list<matEle>* listMatrix;
 int *numOut;
 
+double beta = 0.8;
+double sigma = 0.0001;
+
 double **Matrix;
 double *rold;
 double *rnew;
 
 int maxNode = 0;
+int nowIter = 0;
 //一遍读取原数据，统计总节点数
 void preLoad()
 {
@@ -52,8 +56,11 @@ void makeSpace()
 		for (int i = 0; i < maxNode; i++)
 		{
 			numOut[i] = 0;
+			rold[i] = 1 / maxNode;
+			rnew[i] = 1;
 		}
 	}
+	cout << "making space complete." << endl;
 }
 //计算节点出度并形成邻接链表
 void calcNumOut()
@@ -77,6 +84,7 @@ void calcNumOut()
 			p->rank = numOut[p->nodeId];
 		}
 	}
+	cout << "calcing out degrees complete." << endl;
 }
 //初始化M，rold，rnew
 void preSet()
@@ -84,7 +92,62 @@ void preSet()
 	
 }
 //迭代计算pageRank
-void Iterator()
+bool Iterator()
 {
+	nowIter++;
+	int totalNew = 0;
+	bool rtn = false;//when false this func ends.
+	for (int i = 0; i < maxNode; i++)
+	{
+		list<matEle>::iterator p = listMatrix[i].begin();
+		rnew[i] = 0;
+		if (listMatrix[i].empty())
+		{
+			continue;
+			cout << nowIter << "deadends discovered." << endl;
+		}
+		while (p != listMatrix[i].end())
+		{
+			rnew[i] += rold[i] * p->rank*beta;
+		}
+		totalNew += rnew[i];
+	}
+	for (int i = 0; i < maxNode; i++)
+	{
+		rnew[i] += (1 - totalNew) / maxNode;
+		if (rold[i] - rnew[i] > sigma || rnew[i] - rold[i] > sigma)
+			rtn = true;
+		rold[i] = rnew[i];
+	}
+	cout << nowIter << "iterator complete" << endl;
+	return rtn;
+}
 
+void writeBack()
+{
+	cout << "result preview:" << endl;
+	ofstream out("result.txt");
+	for (int i = 0; i < maxNode; i++)
+	{
+		if (i < 10)
+		{
+			cout << i << " " << rold[i] << endl;
+		}
+		out << i << " " << rold[i] << endl;
+	}
+}
+
+int main()
+{
+	preLoad();
+	makeSpace();
+	calcNumOut();
+	bool iteRtn = true;
+	while (iteRtn)
+	{
+		iteRtn = Iterator();
+	}
+	writeBack();
+	system("pause");
+	return 0;
 }
