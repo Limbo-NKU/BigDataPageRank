@@ -1,6 +1,7 @@
 #include<iostream>
 #include<fstream>
 #include<list>
+#include<algorithm>
 using namespace std;
 
 struct matEle
@@ -12,8 +13,8 @@ struct matEle
 list<matEle>* listMatrix;
 int *numOut;
 
-double beta = 0.8;
-double sigma = 0.0001;
+double beta = 0.85;
+double sigma = 0.000001;
 
 double **Matrix;
 double *rold;
@@ -56,7 +57,7 @@ void makeSpace()
 		for (int i = 0; i < maxNode; i++)
 		{
 			numOut[i] = 0;
-			rold[i] = 1 / maxNode;
+			rold[i] = 1.0 / maxNode;
 			rnew[i] = 1;
 		}
 	}
@@ -71,6 +72,10 @@ void calcNumOut()
 	while (!in.eof())
 	{
 		in >> fromNode >> toNode;
+		//由于使用节点作为下标，下标范围要从1 - maxNode
+		fromNode--;
+		toNode--;
+
 		numOut[fromNode]++;
 		matEle tmp;
 		tmp.nodeId = fromNode;
@@ -81,21 +86,22 @@ void calcNumOut()
 		list<matEle>::iterator p = listMatrix[i].begin();
 		while (p != listMatrix[i].end())
 		{
-			p->rank = numOut[p->nodeId];
+			p->rank = 1.0 / numOut[p->nodeId];
+			p++;
 		}
 	}
 	cout << "calcing out degrees complete." << endl;
-}
-//初始化M，rold，rnew
-void preSet()
-{
-	
+	cout << "out degrees preview:" << endl;
+	for (int i = 0; i < 10; i++)
+	{
+		cout << i + 1 << " " << numOut[i] << endl;
+	}
 }
 //迭代计算pageRank
 bool Iterator()
 {
 	nowIter++;
-	int totalNew = 0;
+	double totalNew =0.0;
 	bool rtn = false;//when false this func ends.
 	for (int i = 0; i < maxNode; i++)
 	{
@@ -103,37 +109,73 @@ bool Iterator()
 		rnew[i] = 0;
 		if (listMatrix[i].empty())
 		{
+			//cout << i << " deadends discovered." << endl;
 			continue;
-			cout << nowIter << "deadends discovered." << endl;
 		}
 		while (p != listMatrix[i].end())
 		{
-			rnew[i] += rold[i] * p->rank*beta;
+			rnew[i] += rold[p->nodeId] * p->rank*beta;
+			p++;
 		}
-		totalNew += rnew[i];
+ 		totalNew+= rnew[i];
 	}
+	double totalOld = 0.0;
 	for (int i = 0; i < maxNode; i++)
 	{
 		rnew[i] += (1 - totalNew) / maxNode;
 		if (rold[i] - rnew[i] > sigma || rnew[i] - rold[i] > sigma)
 			rtn = true;
 		rold[i] = rnew[i];
+		totalOld += rold[i];
 	}
-	cout << nowIter << "iterator complete" << endl;
+	//cout << nowIter << " iterator result preview:" << endl;
+	//cout << "rold total: " << totalOld << endl;
+	//cout << "rnew total: " << totalNew << endl;
+	//for (int i = 0; i < 10; i++)
+	//{
+	//	cout << i + 1 << " " << rnew[i] << endl;
+	//}
+	//cout << endl;
+	//cout << nowIter << "iterator complete" << endl;
+	//system("pause");
 	return rtn;
+}
+
+struct rankList
+{
+	int nodeId;
+	double nodeRank;
+};
+bool rankComp(rankList r1, rankList r2)
+{
+	return r1.nodeRank > r2.nodeRank;
+}
+
+rankList *p;
+
+//计算前100的节点
+void rank100()
+{
+	p = new rankList[maxNode];
+	for (int i = 0; i < maxNode; i++)
+	{
+		p[i].nodeId = i;
+		p[i].nodeRank = rold[i];
+	}
+	sort(p, p+maxNode, rankComp);
 }
 
 void writeBack()
 {
 	cout << "result preview:" << endl;
 	ofstream out("result.txt");
-	for (int i = 0; i < maxNode; i++)
+	for (int i = 0; i < 100; i++)
 	{
 		if (i < 10)
 		{
-			cout << i << " " << rold[i] << endl;
+			cout << p[i].nodeId << " " << p[i].nodeRank << endl;
 		}
-		out << i << " " << rold[i] << endl;
+		out << p[i].nodeId << " " << p[i].nodeRank << endl;
 	}
 }
 
@@ -143,10 +185,13 @@ int main()
 	makeSpace();
 	calcNumOut();
 	bool iteRtn = true;
-	while (iteRtn)
+	//while (iteRtn)
+	for(int i=0;i<100;i++)
 	{
 		iteRtn = Iterator();
 	}
+	cout << nowIter << "iterator complete" << endl;
+	rank100();
 	writeBack();
 	system("pause");
 	return 0;
