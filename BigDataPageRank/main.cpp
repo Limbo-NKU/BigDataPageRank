@@ -1,3 +1,18 @@
+
+/*
+稀疏矩阵优化：
+p->q
+原方法统计的最大值分配空间法很可能会造成大量浪费
+即出现许多入度为0，同时出度也为0的节点（即无关节点）
+将这些节点删去不仅可以减少占用的空间
+还可以增加rnew的精准度
+
+由于复杂度问题，本例中将采用有效位形式标记无关节点
+无法起到减少空间的作用
+但仍可以增加rnew的精准度
+*/
+
+
 #include<iostream>
 #include<fstream>
 #include<list>
@@ -12,9 +27,11 @@ struct matEle
 
 list<matEle>* listMatrix;
 int *numOut;
+bool *valid;
+int validNum;
 
 double beta = 0.85;
-double sigma = 0.000001;
+double sigma = 0.00000001;
 
 double **Matrix;
 double *rold;
@@ -22,6 +39,7 @@ double *rnew;
 
 int maxNode = 0;
 int nowIter = 0;
+int blockSize = 100;
 //一遍读取原数据，统计总节点数
 void preLoad()
 {
@@ -53,12 +71,14 @@ void makeSpace()
 		rnew = new double[maxNode];
 		Matrix = new double*[maxNode];
 		numOut = new int[maxNode];
+		valid = new bool[maxNode];
 		listMatrix = new list<matEle>[maxNode];
 		for (int i = 0; i < maxNode; i++)
 		{
 			numOut[i] = 0;
 			rold[i] = 1.0 / maxNode;
 			rnew[i] = 1;
+			valid[i] = false;
 		}
 	}
 	cout << "making space complete." << endl;
@@ -75,7 +95,8 @@ void calcNumOut()
 		//由于使用节点作为下标，下标范围要从1 - maxNode
 		fromNode--;
 		toNode--;
-
+		valid[fromNode] = true;
+		valid[toNode] = true;
 		numOut[fromNode]++;
 		matEle tmp;
 		tmp.nodeId = fromNode;
@@ -83,6 +104,8 @@ void calcNumOut()
 	}
 	for (int i = 0; i < maxNode; i++)
 	{
+		if (valid[i])
+			validNum++;
 		list<matEle>::iterator p = listMatrix[i].begin();
 		while (p != listMatrix[i].end())
 		{
@@ -91,6 +114,7 @@ void calcNumOut()
 		}
 	}
 	cout << "calcing out degrees complete." << endl;
+	cout << "total valid nodes : " << validNum << endl;
 	cout << "out degrees preview:" << endl;
 	for (int i = 0; i < 10; i++)
 	{
@@ -101,7 +125,7 @@ void calcNumOut()
 bool Iterator()
 {
 	nowIter++;
-	double totalNew =0.0;
+	double totalNew = 0.0;
 	bool rtn = false;//when false this func ends.
 	for (int i = 0; i < maxNode; i++)
 	{
@@ -117,27 +141,32 @@ bool Iterator()
 			rnew[i] += rold[p->nodeId] * p->rank*beta;
 			p++;
 		}
- 		totalNew+= rnew[i];
+		totalNew += rnew[i];
 	}
 	double totalOld = 0.0;
 	for (int i = 0; i < maxNode; i++)
 	{
-		rnew[i] += (1 - totalNew) / maxNode;
+		if (!valid[i])
+		{
+			rnew[i] = 0;
+			continue;
+		}
+		rnew[i] += (1 - totalNew) / validNum;
 		if (rold[i] - rnew[i] > sigma || rnew[i] - rold[i] > sigma)
 			rtn = true;
 		rold[i] = rnew[i];
 		totalOld += rold[i];
 	}
-	//cout << nowIter << " iterator result preview:" << endl;
-	//cout << "rold total: " << totalOld << endl;
-	//cout << "rnew total: " << totalNew << endl;
-	//for (int i = 0; i < 10; i++)
-	//{
-	//	cout << i + 1 << " " << rnew[i] << endl;
-	//}
-	//cout << endl;
+	cout << nowIter << " iterator result preview:" << endl;
+	cout << "rold total: " << totalOld << endl;
+	cout << "rnew total: " << totalNew << endl;
+	for (int i = 0; i < 10; i++)
+	{
+		cout << i + 1 << " " << rnew[i] << endl;
+	}
+	cout << endl;
 	//cout << nowIter << "iterator complete" << endl;
-	//system("pause");
+	system("pause");
 	return rtn;
 }
 
@@ -162,7 +191,7 @@ void rank100()
 		p[i].nodeId = i;
 		p[i].nodeRank = rold[i];
 	}
-	sort(p, p+maxNode, rankComp);
+	sort(p, p + maxNode, rankComp);
 }
 
 void writeBack()
@@ -173,9 +202,9 @@ void writeBack()
 	{
 		if (i < 10)
 		{
-			cout << p[i].nodeId << " " << p[i].nodeRank << endl;
+			cout << p[i].nodeId + 1 << " " << p[i].nodeRank << endl;
 		}
-		out << p[i].nodeId << " " << p[i].nodeRank << endl;
+		out << p[i].nodeId + 1 << " " << p[i].nodeRank << endl;
 	}
 }
 
@@ -185,8 +214,8 @@ int main()
 	makeSpace();
 	calcNumOut();
 	bool iteRtn = true;
-	//while (iteRtn)
-	for(int i=0;i<100;i++)
+	while (iteRtn)
+		//for(int i=0;i<100;i++)
 	{
 		iteRtn = Iterator();
 	}
