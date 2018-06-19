@@ -57,7 +57,7 @@ void preLoad()
 	cout << "preload complete" << endl;
 	cout << "total nodes = " << maxNode << endl;
 	cout << endl;
-	system("pause");
+	//system("pause");
 }
 //第二遍读取原文件，统计每个节点的出度和是否有效 
 void numOutCount()
@@ -105,7 +105,7 @@ void numOutCount()
 	}
 	cout << "count outnode number complete" << endl;
 	cout << endl;
-	system("pause");
+	//system("pause");
 }
 //将原文件分块保存
 void blockSaving()
@@ -152,7 +152,7 @@ void blockSaving()
 	}
 	cout << "split blocks complete" << endl;
 	cout << endl;
-	system("pause");
+	//system("pause");
 }
 //读取块中数据
 void readBlock(int n)
@@ -176,7 +176,7 @@ bool finalProcess()
 	{
 		totalOld += r_new[i];
 	}
-	cout << "previous total rnew :" << totalOld << endl;
+	//cout << "previous total rnew :" << totalOld << endl;
 	for (int i = 0; i<maxNode; i++)
 	{
 		if (!valid[i])
@@ -196,7 +196,7 @@ bool finalProcess()
 			totalNew += r_old[i];
 		}
 	}
-	cout << "next total rnew :" << totalNew << endl;
+	//cout << "next total rnew :" << totalNew << endl;
 	return rtn;
 }
 bool Iterator()
@@ -229,7 +229,8 @@ void topRankCount()
 	}
 	sort(p, p + maxNode, rankComp);
 	cout << "count top 100 complete" << endl;
-	system("pause");
+	cout << endl;
+	//system("pause");
 }
 void writeBack()
 {
@@ -243,7 +244,7 @@ void writeBack()
 		}
 		out << p[i].nodeId + 1 << " " << p[i].nodeRank << endl;
 	}
-	system("pause");
+	//system("pause");
 }
 
 int main()
@@ -256,12 +257,15 @@ int main()
 	while (rtn)
 	{
 		nowIter++;
-		cout << "Iterator " << nowIter << " start" << endl;
+		//cout << "Iterator " << nowIter << " start" << endl;
 		rtn = Iterator();
-		cout << "Iterator " << nowIter << " complete" << endl;
-		system("pause");
+		//cout << "Iterator " << nowIter << " complete" << endl;
+		//system("pause");
 	}
+	cout << "after " << nowIter << " iterator complete" << endl;
+	cout << endl;
 	topRankCount();
 	writeBack();
+	system("pause");
 	return 0;
 }
