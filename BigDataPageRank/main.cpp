@@ -4,30 +4,43 @@
 #include<algorithm>
 using namespace std;
 
-struct matEle
+//data structures
+struct tempStruct
 {
-	int nodeId;
+	int node;
 	double rank;
 };
 
-list<matEle>* listMatrix;
-int *numOut;
-
-double beta = 0.85;
-double sigma = 0.000001;
-
-double **Matrix;
-double *rold;
-double *rnew;
-
+struct matrixLine
+{
+	int fromNode;
+	int degrees;
+	int toNode;
+};
+//const variables
+//counts maximun node number
 int maxNode = 0;
-int nowIter = 0;
+//marks which node is valid
+bool *valid;
+//counts the number of valid node
+int validNum = 0;
+//counts the number of outnodes per node 
+int *numOut;
+//control the size of a block
+int blockSize = 1000;
+int blockNum = 0;
+//pageRank algorithm parameters
+double beta = 0.85;
+double sigma = 0.0000000000001;
+//data of now using block 
+double* r_new;
+double* r_old;
+//list<matrixLine> matrix;
 //一遍读取原数据，统计总节点数
 void preLoad()
 {
 	ifstream in("WikiData.txt");
 	int fromNode, toNode;
-	int maxReport = 0;
 	while (!in.eof())
 	{
 		in >> fromNode >> toNode;
@@ -39,108 +52,162 @@ void preLoad()
 		{
 			maxNode = toNode;
 		}
-		maxReport++;
+
 	}
+	cout << "preload complete" << endl;
 	cout << "total nodes = " << maxNode << endl;
-	cout << "total reports = " << maxReport << endl;
+	cout << endl;
+	//system("pause");
 }
-//根据统计的节点数分配空间
-void makeSpace()
+//第二遍读取原文件，统计每个节点的出度和是否有效 
+void numOutCount()
 {
-	if (maxNode > 0)
+	r_old = new double[maxNode];
+	r_new = new double[maxNode];
+	numOut = new int[maxNode];
+	valid = new bool[maxNode];
+	//初始化 出度数组和有效位数组 
+	for (int i = 0; i<maxNode; i++)
 	{
-		rold = new double[maxNode];
-		rnew = new double[maxNode];
-		Matrix = new double*[maxNode];
-		numOut = new int[maxNode];
-		listMatrix = new list<matEle>[maxNode];
-		for (int i = 0; i < maxNode; i++)
-		{
-			numOut[i] = 0;
-			rold[i] = 1.0 / maxNode;
-			rnew[i] = 1;
-		}
+		numOut[i] = 0;
+		valid[i] = false;
 	}
-	cout << "making space complete." << endl;
-}
-//计算节点出度并形成邻接链表
-void calcNumOut()
-{
-	int  now = 0;
 	ifstream in("WikiData.txt");
 	int fromNode, toNode;
+	//第二遍读取原文件，检测节点的有效性和出度 
 	while (!in.eof())
 	{
 		in >> fromNode >> toNode;
-		//由于使用节点作为下标，下标范围要从1 - maxNode
-		fromNode--;
-		toNode--;
-
-		numOut[fromNode]++;
-		matEle tmp;
-		tmp.nodeId = fromNode;
-		listMatrix[toNode].push_back(tmp);
+		valid[toNode - 1] = true;
+		valid[fromNode - 1] = true;
+		numOut[fromNode - 1]++;
 	}
-	for (int i = 0; i < maxNode; i++)
+	//统计有效节点数量 
+	for (int i = 0; i<maxNode; i++)
 	{
-		list<matEle>::iterator p = listMatrix[i].begin();
-		while (p != listMatrix[i].end())
+		if (valid[i])
 		{
-			p->rank = 1.0 / numOut[p->nodeId];
-			p++;
+			validNum++;
 		}
 	}
-	cout << "calcing out degrees complete." << endl;
-	cout << "out degrees preview:" << endl;
-	for (int i = 0; i < 10; i++)
+	//初始化rold，rnew数组 
+	for (int i = 0; i<maxNode; i++)
 	{
-		cout << i + 1 << " " << numOut[i] << endl;
+		if (valid[i])
+		{
+			r_old[i] = 1 / validNum;
+		}
+		else
+		{
+			r_old[i] = 0;
+		}
+		r_new[i] = 0;
+	}
+	cout << "count outnode number complete" << endl;
+	cout << endl;
+	//system("pause");
+}
+//将原文件分块保存
+void blockSaving()
+{
+	blockNum = maxNode / blockSize + 1;
+	ofstream* out = new ofstream[blockNum];
+	char buf[50];
+	for (int i = 0; i<blockNum; i++)
+	{
+		sprintf_s(buf, "matrixBlock%d.txt", i);
+		out[i].open(buf);
+	}
+	ifstream in("Wikidata.txt");
+	int fromNode, toNode;
+	/*
+	简单形式：
+	while(!in.eof())
+	{
+	in>>fromNode>>toNode;
+	out[fromNode/blockSize]<<fromNode<<" "<<numOut[fromNode]<<" "<<toNode<<endl;
+	}
+	*/
+	int nowNode = -1,nowCount=0;
+	list<int> toList;
+	while (!in.eof())
+	{
+		in >> fromNode >> toNode;
+		if (nowNode != fromNode)
+			//读取当前节点完成，先将原节点写入磁盘 
+		{
+			int tmp;
+			while (!toList.empty())
+			{
+				tmp = toList.front();
+				out[nowNode / blockSize] << nowNode << " " << numOut[nowNode - 1] << " " << tmp << endl;
+				toList.pop_front();
+			}
+			nowNode = fromNode;
+			nowCount = 0;
+		}
+		//节点数据写入队列 
+		nowCount++;
+		toList.push_back(toNode);
+	}
+	cout << "split blocks complete" << endl;
+	cout << endl;
+	//system("pause");
+}
+//读取块中数据
+void readBlock(int n)
+{
+	//matrix.clear();
+	char buf[50];
+	sprintf_s(buf, "matrixBlock%d.txt", n);
+	ifstream in(buf);
+	int fromNode, degree, toNode;
+	while (!in.eof())
+	{
+		in >> fromNode >> degree >> toNode;
+		r_new[toNode - 1] += r_old[fromNode - 1] / degree * beta;
 	}
 }
-//迭代计算pageRank
-bool Iterator()
+bool finalProcess()
 {
-	nowIter++;
-	double totalNew =0.0;
-	bool rtn = false;//when false this func ends.
-	for (int i = 0; i < maxNode; i++)
+	double totalNew = 0.0, totalOld = 0.0;
+	bool rtn = false;
+	for (int i = 0; i<maxNode; i++)
 	{
-		list<matEle>::iterator p = listMatrix[i].begin();
-		rnew[i] = 0;
-		if (listMatrix[i].empty())
+		totalOld += r_new[i];
+	}
+	//cout << "previous total rnew :" << totalOld << endl;
+	for (int i = 0; i<maxNode; i++)
+	{
+		if (!valid[i])
 		{
-			//cout << i << " deadends discovered." << endl;
+			r_new[i] = 0;
 			continue;
 		}
-		while (p != listMatrix[i].end())
+		else
 		{
-			rnew[i] += rold[p->nodeId] * p->rank*beta;
-			p++;
+			r_new[i] += (1 - totalOld) / validNum;
+			if (r_old[i] - r_new[i]>sigma || r_new[i] - r_old[i]>sigma)
+			{
+				rtn = true;
+			}
+			r_old[i] = r_new[i];
+			r_new[i] = 0;
+			totalNew += r_old[i];
 		}
- 		totalNew+= rnew[i];
 	}
-	double totalOld = 0.0;
-	for (int i = 0; i < maxNode; i++)
-	{
-		rnew[i] += (1 - totalNew) / maxNode;
-		if (rold[i] - rnew[i] > sigma || rnew[i] - rold[i] > sigma)
-			rtn = true;
-		rold[i] = rnew[i];
-		totalOld += rold[i];
-	}
-	//cout << nowIter << " iterator result preview:" << endl;
-	//cout << "rold total: " << totalOld << endl;
-	//cout << "rnew total: " << totalNew << endl;
-	//for (int i = 0; i < 10; i++)
-	//{
-	//	cout << i + 1 << " " << rnew[i] << endl;
-	//}
-	//cout << endl;
-	//cout << nowIter << "iterator complete" << endl;
-	//system("pause");
+	//cout << "next total rnew :" << totalNew << endl;
 	return rtn;
 }
-
+bool Iterator()
+{
+	for (int i = 0; i<blockNum; i++)
+	{
+		readBlock(i);
+	}
+	return finalProcess();
+}
+//top100 ranking sort data structure and comp func
 struct rankList
 {
 	int nodeId;
@@ -150,21 +217,21 @@ bool rankComp(rankList r1, rankList r2)
 {
 	return r1.nodeRank > r2.nodeRank;
 }
-
-rankList *p;
-
-//计算前100的节点
-void rank100()
+//ranking data saving array
+rankList* p;
+void topRankCount()
 {
 	p = new rankList[maxNode];
 	for (int i = 0; i < maxNode; i++)
 	{
-		p[i].nodeId = i;
-		p[i].nodeRank = rold[i];
+		p[i].nodeId = i ;
+		p[i].nodeRank = r_old[i];
 	}
-	sort(p, p+maxNode, rankComp);
+	sort(p, p + maxNode, rankComp);
+	cout << "count top 100 complete" << endl;
+	cout << endl;
+	//system("pause");
 }
-
 void writeBack()
 {
 	cout << "result preview:" << endl;
@@ -173,25 +240,31 @@ void writeBack()
 	{
 		if (i < 10)
 		{
-			cout << p[i].nodeId << " " << p[i].nodeRank << endl;
+			cout << p[i].nodeId + 1 << " " << p[i].nodeRank << endl;
 		}
-		out << p[i].nodeId << " " << p[i].nodeRank << endl;
+		out << p[i].nodeId + 1 << " " << p[i].nodeRank << endl;
 	}
+	//system("pause");
 }
 
 int main()
 {
 	preLoad();
-	makeSpace();
-	calcNumOut();
-	bool iteRtn = true;
-	//while (iteRtn)
-	for(int i=0;i<100;i++)
+	numOutCount();
+	blockSaving();
+	bool rtn = true;
+	int nowIter = 0;
+	while (rtn)
 	{
-		iteRtn = Iterator();
+		nowIter++;
+		//cout << "Iterator " << nowIter << " start" << endl;
+		rtn = Iterator();
+		//cout << "Iterator " << nowIter << " complete" << endl;
+		//system("pause");
 	}
-	cout << nowIter << "iterator complete" << endl;
-	rank100();
+	cout << "after " << nowIter << " iterator complete" << endl;
+	cout << endl;
+	topRankCount();
 	writeBack();
 	system("pause");
 	return 0;
